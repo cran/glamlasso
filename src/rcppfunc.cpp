@@ -240,8 +240,7 @@ double alphamax,
        delta, deltamin,
        Lmax,  
        relobjprox, 
-       sprox,
-       tprox, 
+       sprox, 
        valprox, 
        wmax, wsqlossBeta, wsqlossProp, wsqlossX;  
        
@@ -841,7 +840,7 @@ double alphamax, alphanewt,
        Lmax, loglikeBeta, logliketmp, 
        relobjnewt, relobjprox, 
        snewt, sprox,
-       tnewt, tprox, 
+       tnewt,  
        valnewt, valprox, 
        wmax, wsqlossBeta, wsqlossProp, wsqlossX;  
        
@@ -1204,10 +1203,8 @@ Rcpp::NumericVector vecbeta(beta);
 Rcpp::IntegerVector BetaDim = vecbeta.attr("dim");
 arma::cube Beta(vecbeta.begin(), BetaDim[0], BetaDim[1], BetaDim[2], false);
 
-int p1 = Phi1.n_cols;
 int p2 = Phi2.n_cols;
 int p3 = Phi3.n_cols;
-int p = p1 * p2 * p3;
 int n1 = Phi1.n_rows;
 int n2 = Phi2.n_rows;
 int n3 = Phi3.n_rows;

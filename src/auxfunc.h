@@ -366,7 +366,7 @@ for (int i = 0; i < out.n_rows; i++){
   
 for (int j = 0; j < out.n_cols; j++){
 
-out(i, j) = - std::lgamma(y(i, j) + 1);
+out(i, j) = - lgamma(y(i, j) + 1);
 
 }
 
