@@ -19,47 +19,45 @@
 #     along with this program.  If not, see <http://www.gnu.org/licenses/>
 #
 
-#' @name glamlasso
+#' @name glamlassoS
 #' 
 #' @title Penalization in Large Scale Generalized Linear Array Models
 #' 
-#' @description  Efficient design matrix free procedure for fitting large scale penalized  2 or 3-dimensional
-#' generalized linear array models (GLAM). It is also possible to fit an additional non-tensor structured component 
-#' - e.g an intercept - however this can reduce the computational efficiency of the procedure substanstially. 
-#' Currently the LASSO penalty and the SCAD penalty are both implemented. Furthermore,
-#' the Gaussian model with identity link,  the Binomial model with logit link, the Poisson model
-#' with log link and the Gamma model with log link is currently implemented. The underlying algorithm combines gradient descent and proximal gradient (gdpg algorithm), see  \cite{Lund et al., 2017}. 
+#' @description  Efficient design matrix free procedure for fitting   a special case of  a generalized linear  model 
+#' with  array structured response and partially tensor structured covariates.  See \cite{Lund et al., 2017} for an application of this special purpose function. 
 #'  
-#' @usage  glamlasso(X, 
-#'           Y, 
-#'           Z = NULL,
-#'           family = "gaussian",
-#'           penalty = "lasso",
-#'           intercept = FALSE,
-#'           weights = NULL,
-#'           thetainit = NULL,
-#'           alphainit = NULL,
-#'           nlambda = 100,
-#'           lambdaminratio = 1e-04,
-#'           lambda = NULL,
-#'           penaltyfactor = NULL,
-#'           penaltyfactoralpha = NULL,
-#'           reltolinner = 1e-07,
-#'           reltolouter = 1e-04,
-#'           maxiter = 15000,
-#'           steps = 1,
-#'           maxiterinner = 3000,
-#'           maxiterouter = 25,
-#'           btinnermax = 100,
-#'           btoutermax = 100,
-#'           iwls = "exact",
-#'           nu = 1)
+#' @usage  glamlassoS(X, 
+#'            Y,
+#'            V, 
+#'            Z = NULL,
+#'            family = "gaussian",
+#'            penalty = "lasso",
+#'            intercept = FALSE,
+#'            weights = NULL,
+#'            thetainit = NULL,
+#'            alphainit = NULL,
+#'            nlambda = 100,
+#'            lambdaminratio = 1e-04,
+#'            lambda = NULL,
+#'            penaltyfactor = NULL,
+#'            penaltyfactoralpha = NULL,
+#'            reltolinner = 1e-07,
+#'            reltolouter = 1e-04,
+#'            maxiter = 15000,
+#'            steps = 1,
+#'            maxiterinner = 3000,
+#'            maxiterouter = 25,
+#'            btinnermax = 100,
+#'            btoutermax = 100,
+#'            iwls = "exact",
+#'            nu = 1)
 #'            
 #' @param X A list containing the tensor components (2 or 3) of the tensor design matrix.
 #'  These are  matrices of sizes \eqn{n_i   \times p_i}.
 #' @param Y The response values, an array of size \eqn{n_1 \times\cdots\times n_d}. For option 
 #' \code{family = "binomial"} this array must contain the proportion of successes and the 
 #' number of trials is then specified as \code{weights} (see below).
+#' @param V The weight values, an array of size \eqn{n_1 \times\cdots\times n_d}.  
 #' @param Z The non tensor structrured part of the design matrix. A matrix of size \eqn{n_1 \cdots n_d\times q}. 
 #' Is set to \code{NULL} as default. 
 #' @param family A string specifying the model family (essentially the response distribution). Possible values 
@@ -101,39 +99,16 @@
 #' sizes and presumably more backtracking in the inner loop. The default is \code{nu = 1} and the option is only 
 #' used if \code{iwls = "exact"}.
 #' 
-#' @details Consider a (two component) generalized linear model (GLM) 
-#' \deqn{g(m) = X\theta + Z\alpha =: \eta.}
-#' Here \eqn{g} is a link function, \eqn{m} is a \eqn{n\times 1} vector containing the mean of the 
-#' response variable  \eqn{Y}, \eqn{Z} is a \eqn{n\times q} matrix and  \eqn{X} a \eqn{n\times p} matrix  with tensor structure 
-#'  \deqn{X =  X_d\otimes\ldots\otimes X_1,}
-#'   where \eqn{X_1,\ldots,X_d} are the marginal \eqn{n_i\times p_i} design matrices (tensor factors) such that
-#'  \eqn{p = p_1\cdots p_d} and  \eqn{n=n_1\cdots n_d}. Then \eqn{\theta} is the \eqn{p\times 1} parameter associated with the tensor component
-#'   \eqn{X} and \eqn{\alpha} the \eqn{q\times 1} parameter associated with the non-tensor component \eqn{Z}, e.g. the intercept. 
-#'  
-#' The related log-likelihood is a function of  \eqn{\tilde\theta:=(\theta,\alpha)} through the linear predictor \eqn{\eta} i.e. \eqn{\tilde\theta \mapsto l(\eta(\tilde\theta))}.
-#' In the usual exponential family framework this can be expressed as
-#' \deqn{l(\eta(\tilde\theta)) = \sum_{i = 1}^n a_i \frac{y_i \vartheta(\eta_i(\tilde\theta)) - b(\vartheta(\eta_i(\tilde\theta)))}{\psi}+c(y_i,\psi)} 
-#' where \eqn{\vartheta}, the canonical parameter map,  is linked to the  linear predictor via the identity
-#'  \eqn{\eta(\tilde\theta) = g(b'(\vartheta))} with \eqn{b} the cumulant function. Here \eqn{a_i \ge 0, i = 1,\ldots,n} are observation weights and
-#'  \eqn{\psi} is the dispersion parameter.
-#' 
-#' By ignoring the non-tensor component \eqn{Z} (assume \eqn{\alpha = 0}) we can use the generalized linear array model (GLAM) framework to write the model equation as
-#'  \deqn{g(M) = \rho(X_d,\rho(X_{d-1},\ldots,\rho(X_1,\Theta))),}
-#' where \eqn{\rho} is the so called rotated \eqn{H}-transform and \eqn{M} and \eqn{\Theta} 
-#' are the  array versions of \eqn{m} and \eqn{\theta} respectively. See \cite{Currie et al., 2006} for more details.
-#'         
-#' For \eqn{d = 3} or \eqn{d = 2}, using only the marginal matrices \eqn{X_1,X_2,\ldots}, the function \code{glamlasso} solves the penalized estimation problem 
-#' \deqn{\min_{\theta} -l(\eta(\theta)) + \lambda J (\theta),} 
-#' for \eqn{J} either the LASSO or SCAD penalty function,  in the GLAM setup for a sequence of penalty parameters \eqn{\lambda>0}. The underlying algorithm is based on an outer 
-#' gradient descent loop and an inner proximal gradient based loop. We note that if \eqn{J} is not 
-#' convex, as with the SCAD penalty, we use the multiple step adaptive lasso procedure to loop over the inner proximal algorithm, see \cite{Lund et al., 2017} for more details.
+#' @details  Given the setting from \code{\link{glamlasso}} we consider a model
+#'  where the tensor design component is only partially tensor structured as
+#'  \deqn{X = [V_1X_2^\top\otimes X_1^\top,\ldots,V_{n_3}X_2^\top\otimes X_1^\top]^\top.} 
+#'  Here  \eqn{X_i} is a \eqn{n_i\times p_i} matrix  for \eqn{i=1,2} and  \eqn{V_i} is a \eqn{n_1n_2\times n_1n_2} diagonal matrix for \eqn{i=1,\ldots,n_3}.
 #'   
-#' Furthermore, the function \code{glamlasso} also solves the penalized estimation problem for a model that  includes  a non-tensor component \eqn{Z}, e.g. an intercept. However, 
-#' not without incurring a  potentially substantial computational cost. Especially it is not advisable to inlcude a very large non-tensor component in the model (large \eqn{q}) 
-#' and even  adding an intecept to the model (\eqn{q=1}) will result in a reduction of computational efficiency.     
+#'Letting \eqn{Y} denote the  \eqn{n_1\times n_2\times n_3} response array and \eqn{V} the  \eqn{n_1\times n_2\times n_3}  weight array containing the diagonals of the \eqn{V_i}s, 
+#'the function \code{glamlassoS} solves the PMLE problem using  \eqn{Y, V, X_1, X_2} and the non-tensor component \eqn{Z} as input.
 #'   
 #' @return An object with S3 Class "glamlasso". 
-#' \item{spec}{A string indicating the GLAM dimension (\eqn{d = 2, 3}), the model family and the penalty.}  
+#' \item{spec}{A string indicating the model family and the penalty.}  
 #' \item{beta}{A \eqn{p_1\cdots p_d \times} \code{nlambda} matrix containing the estimates of 
 #' the parameters for the tensor structured part of the model (\code{beta}) for each \code{lambda}-value.}
 #' \item{alpha}{A \eqn{q \times} \code{nlambda} matrix containing the estimates of 
@@ -155,60 +130,55 @@
 #' Maintainer: Adam Lund, \email{adam.lund@@math.ku.dk}
 #' 
 #' @references 
-#' Lund, A., M. Vincent, and N. R. Hansen (2017). Penalized estimation in 
-#' large-scale generalized linear array models. 
-#' \emph{Journal of Computational and Graphical Statistics}, 26, 3, 709-724.  url = {https://doi.org/10.1080/10618600.2017.1279548}.
-#' 
-#' Currie, I. D., M. Durban, and P. H. C. Eilers (2006). Generalized linear
-#' array models with applications to multidimensional smoothing. 
-#' \emph{Journal of the Royal Statistical Society. Series B}. 68, 259-280. url = {http://dx.doi.org/10.1111/j.1467-9868.2006.00543.x}.
+#' Lund, A. and N. R. Hansen (2017). Sparse Network  Estimation for  Dynamical Spatio-temporal Array Models. 
+#'  \emph{ArXiv}.
 #' 
 #' @keywords package 
 #'
 #' @examples 
-#' ##size of example 
-#' n1 <- 65; n2 <- 26; n3 <- 13; p1 <- 12; p2 <- 6; p3 <- 4
-#' 
-#' ##marginal design matrices (tensor components)
-#' X1 <- matrix(rnorm(n1 * p1), n1, p1) 
-#' X2 <- matrix(rnorm(n2 * p2), n2, p2) 
-#' X3 <- matrix(rnorm(n3 * p3), n3, p3) 
-#' X <- list(X1, X2, X3)
-#' 
-#' ##############gaussian example 
-#' Beta <- array(rnorm(p1 * p2 * p3) * rbinom(p1 * p2 * p3, 1, 0.1), c(p1 , p2, p3))
-#' Mu <- RH(X3, RH(X2, RH(X1, Beta)))
-#' Y <- array(rnorm(n1 * n2 * n3, Mu), c(n1, n2, n3))
-#' 
-#' system.time(fit <- glamlasso(X, Y))
-#' 
-#' modelno <- length(fit$lambda)
-#' plot(c(Beta), type = "h", ylim = range(Beta, fit$coef[, modelno]))
-#' points(c(Beta))
-#' lines(fit$coef[ , modelno], col = "red", type = "h")
-#' 
 #' \dontrun{
+#' 
+#' ##size of example
+#' n1 <- 65; n2 <- 26; n3 <- 13; p1 <- 13; p2 <- 5; 
+#'
+#' ##marginal design matrices (tensor components)
+#' X1 <- matrix(rnorm(n1 * p1), n1, p1)
+#' X2 <- matrix(rnorm(n2 * p2), n2, p2)
+#' X <- list(X1, X2)
+#' V <- array(rnorm(n3 * n2 * n1), c(n1, n2, n3))
+#'
+#' ##gaussian example
+#' Beta <- array(rnorm(p1 * p2) * rbinom(p1 * p2, 1, 0.1), c(p1 , p2))
+#' Mu <- V * array(RH(X2, RH(X1, Beta)), c(n1, n2, n3))
+#' Y <- array(rnorm(n1 * n2 * n3, Mu), c(n1, n2, n3))
+#' system.time(fit <- glamlassoS(X, Y, V))
+#'
+#' modelno <- length(fit$lambda)
+#' plot(c(Beta), ylim = range(Beta, fit$coef[, modelno]), type = "h")
+#' points(c(Beta))
+#' lines(c(fit$coef[, modelno]), col = "red", type = "h")
+#'
 #' ###with non tensor design component Z
 #' q <- 5
 #' alpha <- matrix(rnorm(q)) * rbinom(q, 1, 0.5)
 #' Z <- matrix(rnorm(n1 * n2 * n3 * q), n1 * n2 *n3, q) 
 #' Y <- array(rnorm(n1 * n2 * n3, Mu + array(Z %*% alpha, c(n1, n2, n3))), c(n1, n2, n3))
-#' system.time(fit <- glamlasso(X, Y, Z))
+#' system.time(fit <- glamlassoS(X, Y, V , Z))
 #' 
 #' modelno <- length(fit$lambda)
 #' par(mfrow = c(1, 2))
-#' plot(c(Beta), type = "l", ylim = range(Beta, fit$coef[, modelno]))
+#' plot(c(Beta), type="h", ylim = range(Beta, fit$coef[, modelno]))
 #' points(c(Beta))
-#' lines(fit$coef[ , modelno], col = "red")
-#' plot(c(alpha), type = "h", ylim = range(Beta, fit$alpha[, modelno]))
+#' lines(fit$coef[ , modelno], col = "red", type = "h")
+#' plot(c(alpha), type = "h", ylim = range(alpha, fit$alpha[, modelno]))
 #' points(c(alpha))
 #' lines(fit$alpha[ , modelno], col = "red", type = "h")
 #' 
 #' ################ poisson example
-#' Beta <- array(rnorm(p1 * p2 * p3, 0, 0.1) * rbinom(p1 * p2 * p3, 1, 0.1), c(p1 , p2, p3))
-#' Mu <- RH(X3, RH(X2, RH(X1, Beta)))
+#' Beta <- matrix(rnorm(p1 * p2, 0, 0.1) * rbinom(p1 * p2, 1, 0.1), p1 , p2)
+#' Mu <- V * array(RH(X2, RH(X1, Beta)), c(n1, n2, n3))
 #' Y <- array(rpois(n1 * n2 * n3, exp(Mu)), dim = c(n1, n2, n3))
-#' system.time(fit <- glamlasso(X, Y, family = "poisson", nu = 0.1))
+#' system.time(fit <- glamlassoS(X, Y, V, family = "poisson", nu = 0.1))
 #' 
 #' modelno <- length(fit$lambda)
 #' plot(c(Beta), type = "h", ylim = range(Beta, fit$coef[, modelno]))
@@ -217,13 +187,14 @@
 #' 
 #' }
 
-glamlasso <-function(X,
+glamlassoS <-function(X,
                      Y, 
+                     V,
                      Z = NULL, 
                      family = "gaussian",
                      penalty = "lasso",
                      intercept = FALSE,
-                     weights = NULL,
+                     weights = NULL, 
                      thetainit = NULL,
                      alphainit = NULL,
                      nlambda = 100,
@@ -238,33 +209,28 @@ glamlasso <-function(X,
                      maxiterinner = 3000,
                      maxiterouter = 25,
                      btinnermax = 100,
-                     btoutermax = 100,
+                     btoutermax = 100, 
                      iwls = "exact",
                      nu = 1) {
-
-##get dimensions of problem
+  
+ ##get dimensions of problem
 dimglam <- length(X)
 
-if (dimglam < 2 || dimglam > 3){
-  
-  stop(paste("the dimension of the GLAM must be 2 or 3!"))
-  
-}else if(dimglam == 2){X[[3]] <- matrix(1, 1, 1)} 
+n1 <- dim(Y)[1]
+n2 <- dim(Y)[2]
+n3 <- dim(Y)[3]
 
 X1 <- X[[1]]
 X2 <- X[[2]]
-X3 <- X[[3]]
+X3 <- matrix(1, 1, 1)
 
 dimX <- rbind(dim(X1), dim(X2), dim(X3))
 
-n1 <- dimX[1, 1]
-n2 <- dimX[2, 1]
-n3 <- dimX[3, 1]
 p1 <- dimX[1, 2]
 p2 <- dimX[2, 2]
 p3 <- dimX[3, 2]
-n <- prod(dimX[,1])
-p <- prod(dimX[,2])
+n <- n1 * n2 * n3
+p <- p1 * p2 * p3
 
 ## nontensor component Z and intercept
 if(is.null(Z) == TRUE & intercept == FALSE){
@@ -292,8 +258,12 @@ q <- dim(Z)[2]
 
 }
 
-####reshape Y into matrix
+####check on V
+if(sum(dim(V) == dim(Y)) < 3){stop("dimensions of Y and V are not identical!")}
+
+####reshape Y and V into matrix
 Y <- matrix(Y, n1, n2 * n3)
+V <- matrix(V, n1, n2 * n3)
 
 ####check on family
 if(sum(family == c("gaussian", "binomial", "poisson", "gamma")) != 1){
@@ -323,7 +293,6 @@ weightedgaussian <- 1
 weights <- matrix(weights, n1, n2 * n3)
 
 }
-
 
 ####check on initial values 
 if(is.null(thetainit)){thetainit <- matrix(0, p1, p2 * p3)}else{thetainit <- matrix(thetainit, p1, p2 * p3)}
@@ -403,7 +372,7 @@ if(nu < 0 || nu > 1){stop(paste("nu must be between 0 and 1"))}
 res <- gdpg(X1, X2, X3,
             Z, matrix(0, n, q),##non ten design
             Y, matrix(0, n3, n1 * n2),
-            matrix(0, n1, n2 * n3), #maybe V could be used in source only when S==1!!!!!
+            V, #maybe V could be used in source only when S==1!!!!!
             weights, matrix(0, n3, n1 * n2),
             thetainit, matrix(0, 1, 1), matrix(0, 1, 1),
             alphainit, ## non ten par
@@ -425,7 +394,7 @@ res <- gdpg(X1, X2, X3,
             1,
             btinnermax,
             btoutermax,
-            weightedgaussian, 0, 0, n1, n2, n3)
+            weightedgaussian, 1, 0, n1, n2, n3)
 
 ####checks
 if(res$STOPmaxiter == 1){
